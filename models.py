@@ -107,7 +107,7 @@ class HeadGaussianDiagonal(nn.Module):
 
         if self.training:
             std = torch.exp(0.5 * logvar)
-            eps = torch.randn_like(std) 
+            eps = torch.randn_like(std)
             z = mu + eps * std
         else:
             z = mu
@@ -126,7 +126,7 @@ class HeadGaussianIsotropic(nn.Module):
         mu = self.fc_mu(x)
         logvar_scalar = self.fc_logvar(x)
         logvar = logvar_scalar.expand(-1, self.latent_dim)
-        
+
         if self.training:
             std = torch.exp(0.5 * logvar)
             eps = torch.randn_like(std)

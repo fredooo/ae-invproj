@@ -6,7 +6,7 @@ exclude = ["build", "dist", ".venv", "__pycache__"]
 
 [tool.black]
 line-length = 120
-target-version = ['py311']
+target-version = ['py312']
 skip-string-normalization = false
 fast = false
 

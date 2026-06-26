@@ -2,11 +2,11 @@ import gc
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import BoundaryNorm
 import numpy as np
 import pandas as pd
 import torch
 import umap
+from matplotlib.colors import BoundaryNorm
 from sklearn.decomposition import PCA
 from sklearn.manifold import MDS, TSNE, Isomap, LocallyLinearEmbedding
 

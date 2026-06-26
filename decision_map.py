@@ -1,17 +1,13 @@
 import os
 from typing import Optional
 
-from matplotlib.colors import BoundaryNorm
 import matplotlib.pyplot as plt
-
 import numpy as np
 import torch
+from matplotlib.colors import BoundaryNorm
 from tqdm import tqdm
 
 from models import Decoder
-
-
-
 
 
 class DecisionMap:
@@ -123,7 +119,7 @@ class DecisionMap:
 
         plt.imshow(grid_labels, cmap="tab10", norm=norm, extent=(0, 1, 0, 1), alpha=0.93)
 
-        #remapped_labels = np.vectorize(self.label_map.get)(labels.astype(int))
+        # remapped_labels = np.vectorize(self.label_map.get)(labels.astype(int))
 
         labels_int = labels.astype(int)
         missing = set(np.unique(labels_int)) - set(self.label_map.keys())
@@ -135,7 +131,14 @@ class DecisionMap:
 
         if self.point_size > 0.0:
             plt.scatter(
-                scaled[:, 0], scaled[:, 1], c=remapped_labels, cmap="tab10", norm=norm, s=self.point_size, edgecolor="black", lw=0.6
+                scaled[:, 0],
+                scaled[:, 1],
+                c=remapped_labels,
+                cmap="tab10",
+                norm=norm,
+                s=self.point_size,
+                edgecolor="black",
+                lw=0.6,
             )
 
         plt.axis("off")

@@ -1,5 +1,5 @@
 #!/bin/bash
-# lint.sh - code quality checks and formatting
+# dev.sh - code quality checks and formatting
 
 set -e
 

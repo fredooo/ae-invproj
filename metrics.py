@@ -1,6 +1,7 @@
 import numba
 import numpy as np
 
+
 @numba.njit(parallel=True)
 def argsort_rows(X):
     n, m = X.shape
@@ -127,7 +128,7 @@ def trustworthiness_continuity_powers_of_two(D_high, D_low):
     ranks_proj = _compute_ranks_from_argsort(nn_proj)
 
     trust_partial = np.zeros((n, kmax + 1), dtype=np.float64)
-    cont_partial  = np.zeros((n, kmax + 1), dtype=np.float64)
+    cont_partial = np.zeros((n, kmax + 1), dtype=np.float64)
 
     for i in numba.prange(n):
         t_sum = 0.0
@@ -147,7 +148,7 @@ def trustworthiness_continuity_powers_of_two(D_high, D_low):
                 c_sum += r_proj - k
 
             trust_partial[i, k] = t_sum
-            cont_partial[i, k]  = c_sum
+            cont_partial[i, k] = c_sum
 
     # Count how many powers of two we have
     count = 0
@@ -156,9 +157,9 @@ def trustworthiness_continuity_powers_of_two(D_high, D_low):
         count += 1
         k *= 2
 
-    ks    = np.empty(count, dtype=np.int64)
+    ks = np.empty(count, dtype=np.int64)
     trust = np.empty(count, dtype=np.float64)
-    cont  = np.empty(count, dtype=np.float64)
+    cont = np.empty(count, dtype=np.float64)
 
     idx = 0
     k = 2
@@ -167,9 +168,9 @@ def trustworthiness_continuity_powers_of_two(D_high, D_low):
         total_c = cont_partial[:, k].sum()
         norm = n * k * (2 * n - 3 * k - 1)
 
-        ks[idx]    = k
+        ks[idx] = k
         trust[idx] = 1.0 - (2.0 * total_t) / norm
-        cont[idx]  = 1.0 - (2.0 * total_c) / norm
+        cont[idx] = 1.0 - (2.0 * total_c) / norm
 
         idx += 1
         k *= 2

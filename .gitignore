@@ -13,6 +13,10 @@ images/**/*.jpg
 images/**/*.pdf
 images/**/*.png
 
+# ...except the README figures
+!images/overview.png
+!images/framework.png
+
 preprocessed/**/*.csv
 preprocessed/**/*.npy
 
@@ -252,3 +256,5 @@ desktop.ini
 
 # WSL
 *Zone.Identifier
+
+CLAUDE.md

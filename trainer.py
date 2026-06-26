@@ -1,35 +1,19 @@
+import argparse
 import logging
 import sys
 import time
 from dataclasses import dataclass
-import datetime
 from pathlib import Path
 from typing import List, Literal
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import pairwise_distances
 import torch
-import torch.nn.functional as F
+from sklearn.metrics import pairwise_distances
 from torch.optim import Adam, Optimizer
 from torch.utils.data import DataLoader
 
-from config import (
-    AdaptiveAvgPool2dConfig,
-    BatchNorm1dConfig,
-    BatchNorm2dConfig,
-    Config,
-    Conv2dConfig,
-    ConvTranspose2dConfig,
-    Dropout1dConfig,
-    FlattenConfig,
-    LinearConfig,
-    LossConfig,
-    ModelConfig,
-    ProjectionLossConfig,
-    TrainingConfig,
-    UnflattenConfig,
-)
+from config import Config
 from data_loader import create_loaders_for_dataset
 from loss_function import LossFn, create_loss_function, create_projection_loss, create_reconstruction_loss
 from metrics import trustworthiness_continuity_powers_of_two
@@ -84,7 +68,7 @@ def training_step(train_loader: DataLoader, model: EncoderDecoder, tasks: List[T
 
 def validation_test_step(val_loader: DataLoader, model: EncoderDecoder, tasks: List[TrainingTask]):
     model.eval()
-    losses = torch.zeros(4,  device=device)
+    losses = torch.zeros(4, device=device)
 
     with torch.no_grad():
         for original, proj_target, _ in val_loader:
@@ -121,19 +105,22 @@ def store_trust_cont(
     cont: np.ndarray,
     filename: str,
 ) -> None:
-    df = pd.DataFrame({
-        "k": ks,
-        "Trust": trust,
-        "Continuity": cont,
-    })
+    df = pd.DataFrame(
+        {
+            "k": ks,
+            "Trust": trust,
+            "Continuity": cont,
+        }
+    )
 
     df.to_csv(filename, index=False)
 
 
 class ValidationSaveStop:
-    def __init__(self, patience: int = 5, save: bool = True):
+    def __init__(self, patience: int = 5, save: bool = True, models_dir: str = "models"):
         self.patience = patience
         self.save = save
+        self.models_dir = models_dir
         self.counter = 0
         self.best_val_loss = float("inf")
 
@@ -142,7 +129,7 @@ class ValidationSaveStop:
             self.best_val_loss = val_loss
             self.counter = 0
             if self.save:
-                save_model(model)
+                save_model(model, self.models_dir)
                 return "SAVED"
             return "IMPROVED"
         else:
@@ -180,7 +167,7 @@ def collect_test_spaces(test_loader, model, device):
     model.eval()
 
     X_high = []
-    X_low  = []
+    X_low = []
 
     for original, _, _ in test_loader:
         x = original.to(device)
@@ -191,17 +178,22 @@ def collect_test_spaces(test_loader, model, device):
         X_low.append(z.cpu())
 
     X_high = torch.cat(X_high, dim=0).numpy()
-    X_low  = torch.cat(X_low,  dim=0).numpy()
+    X_low = torch.cat(X_low, dim=0).numpy()
 
     return X_high, X_low
 
 
-def train(config: Config) -> EncoderDecoder:
+def train(
+    config: Config,
+    records_dir: str = "./records",
+    models_dir: str = "models",
+    preprocessed_dir: str = "./preprocessed",
+) -> EncoderDecoder:
     set_seed(config.training.seed)
 
     # Load dataset
     train_loader, val_loader, test_loader = create_loaders_for_dataset(
-        config.dataset, config.projection, batch_size=config.training.batch_size
+        config.dataset, config.projection, batch_size=config.training.batch_size, preprocessed_dir=preprocessed_dir
     )
 
     # Initialize model
@@ -222,7 +214,7 @@ def train(config: Config) -> EncoderDecoder:
     # Training loop
     #
 
-    save_stop = ValidationSaveStop(patience=config.training.patience)
+    save_stop = ValidationSaveStop(patience=config.training.patience, models_dir=models_dir)
     train_records = []
     val_records = []
 
@@ -244,89 +236,61 @@ def train(config: Config) -> EncoderDecoder:
 
     filename = Config.create_filename(model.config)
     training_time = time.time() - start
+    records = Path(records_dir)
+    records.mkdir(parents=True, exist_ok=True)
     logger.info(f"{filename}: Training time = {training_time} seconds")
-    store_losses(train_records, f"./records/{filename}.train.csv")
-    store_losses(val_records, f"./records/{filename}.val.csv")
+    store_losses(train_records, str(records / f"{filename}.train.csv"))
+    store_losses(val_records, str(records / f"{filename}.val.csv"))
 
     # Evaluate on test set
     avg_test_losses = validation_test_step(test_loader, model, tasks)
     test_log = loss_log_string("Test", avg_test_losses)
     logger.info(f"{filename}: {test_log}")
-    store_losses([avg_test_losses], f"./records/{filename}.test.csv", time=training_time, epochs=(epoch + 1))
-
+    store_losses([avg_test_losses], str(records / f"{filename}.test.csv"), time=training_time, epochs=(epoch + 1))
 
     X_high, X_low = collect_test_spaces(test_loader, model, device)
 
     D_high = pairwise_distances(X_high, metric="euclidean")
-    D_low  = pairwise_distances(X_low,  metric="euclidean")
-    
+    D_low = pairwise_distances(X_low, metric="euclidean")
+
     ks, trust, cont = trustworthiness_continuity_powers_of_two(D_high, D_low)
-    
-    store_trust_cont(ks, trust, cont, f"./records/{filename}.truts-cont.csv")
+
+    store_trust_cont(ks, trust, cont, str(records / f"{filename}.truts-cont.csv"))
 
     return model
 
 
-def old_main():
-    config = Config(
-        dataset="fmnist",
-        projection="tsne",
-        comment="test",
-        model=ModelConfig(
-            type="vae",
-            io_dim=28 * 28,
-            latent_dim=2,
-            encoder_layers=[
-                LinearConfig(out_features=1024, activation="sigmoid"),
-                LinearConfig(out_features=512, activation="sigmoid"),
-                LinearConfig(out_features=256, activation="sigmoid"),
-                LinearConfig(out_features=128, activation="sigmoid"),
-                LinearConfig(out_features=64, activation="sigmoid"),
-            ],
-            decoder_layers=[
-                LinearConfig(out_features=64, activation="sigmoid"),
-                LinearConfig(out_features=128, activation="sigmoid"),
-                LinearConfig(out_features=256, activation="sigmoid"),
-                LinearConfig(out_features=512, activation="sigmoid"),
-                LinearConfig(out_features=1024, activation="sigmoid"),
-                LinearConfig(out_features=28 * 28, activation="sigmoid"),
-            ],
-        ),
-        loss_recon=LossConfig(loss_fn="bce", weight=100.0),
-        loss_proj=ProjectionLossConfig(target="latent", loss_fn="mse", weight=10.0),
-        loss_reg=LossConfig(loss_fn="kl_div", weight=0.1),
-        training=TrainingConfig(max_epochs=1000, batch_size=128, learning_rate=1e-4, patience=20, seed=777),
-    )
-
-    model = train(config)
-    render_all_images(model)
-
-
-
 def main():
-    yaml_dir = Path("./af_yaml")
-    records_dir = Path("./records")
-    cutoff_date = datetime.datetime(2026, 1, 12)
-
-    yaml_files = sorted(
-        list(yaml_dir.glob("*.yaml")) +
-        list(yaml_dir.glob("*.yml"))
+    parser = argparse.ArgumentParser(description="Train models from YAML configs.")
+    parser.add_argument("--config-dir", type=Path, default=Path("./configs"), help="Directory of experiment YAMLs.")
+    parser.add_argument("--records-dir", type=Path, default=Path("./records"), help="Output dir for training records.")
+    parser.add_argument("--models-dir", type=Path, default=Path("models"), help="Output dir for checkpoints + configs.")
+    parser.add_argument(
+        "--preprocessed-dir", type=Path, default=Path("./preprocessed"), help="Dir of 2D projection targets."
     )
+    parser.add_argument("--force", action="store_true", help="Retrain even if a test record already exists.")
+    parser.add_argument("--no-render", action="store_true", help="Skip rendering evaluation images after training.")
+    args = parser.parse_args()
+
+    yaml_files = sorted(list(args.config_dir.glob("*.yaml")) + list(args.config_dir.glob("*.yml")))
 
     for yaml_path in yaml_files:
         config = Config.load_from_yaml(str(yaml_path))
-        output_filename = config.create_filename()
-        test_file = records_dir / f"{output_filename}.test.csv"
+        test_file = args.records_dir / f"{config.create_filename()}.test.csv"
 
-        if test_file.exists():
-            mod_time = datetime.datetime.fromtimestamp(test_file.stat().st_mtime)
-            if mod_time > cutoff_date:
-                print(f"Skipping {yaml_path.name} (already trained)")
-                continue
+        if test_file.exists() and not args.force:
+            print(f"Skipping {yaml_path.name} (already trained; use --force to retrain)")
+            continue
 
         print(f"Training: {yaml_path.name}")
-        model = train(config)
-        render_all_images(model)
+        model = train(
+            config,
+            records_dir=str(args.records_dir),
+            models_dir=str(args.models_dir),
+            preprocessed_dir=str(args.preprocessed_dir),
+        )
+        if not args.no_render:
+            render_all_images(model, preprocessed_dir=str(args.preprocessed_dir))
 
 
 if __name__ == "__main__":

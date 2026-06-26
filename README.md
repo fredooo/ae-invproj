@@ -15,6 +15,21 @@
 * Provides visualization tools: reconstruction comparisons, latent space scatter plots, decoded grids, gradient magnitude maps, and decision boundary maps.
 * YAML-based experiment configuration with deterministic seeding, early stopping, and automated parameter sweeps.
 
+## Overview
+
+**Basic Idea:**
+
+![Autoencoder-based regularization for parametric and inverse projections][1]
+
+In our framework, the *encoder* network learns a parametric projection $P$ mapping new data record $x_i$ into 2D space (as $\hat{y}_i$). The *decoder* learns the inverse projection $P^{-1}$ generating a high-dimensional sample $\hat{x}_i$ from any 2D point $y_i$. Our approaches can utilize the losses: $\mathcal{L}_{\text{recon}}$, ensuring correct reconstruction; $\mathcal{L}_{\text{proj}}$, aligning $\hat{y}$ with points of the projection; and $\mathcal{L}_{\text{reg}}$, regularizing the latent space to avoid discontinuity.
+
+![Framework for Autoencoder-based parametric and inverse projections][2]
+
+In our framework (a), the *encoder* network learns a parametric projection $P$ mapping new data record $x_i$ into 2D space (as $\hat{y}_i$). The *decoder* learns the inverse projection $P^{-1}$ generating a high-dimensional sample $\hat{x}_i$ from any 2D point $y_i$. Our approaches can utilize the losses: $\mathcal{L}_{\text{recon}}$, ensuring correct reconstruction; $\mathcal{L}_{\text{proj}}$, aligning $\hat{y}$ with points of the projection; and $\mathcal{L}_{\text{reg}}$, regularizing the latent space to avoid discontinuity. We evaluate three architectures: (b) Two feed-forward NNs, i.e., *Projector and Reconstructor* (P&R), are trained separately to learn a forward and inverse mapping between data and projection spaces without end-to-end optimization or latent space regularization. (c) An *Autoencoder* (AE) is trained end-to-end, with a joint loss that combines reconstruction accuracy and a latent-space alignment term to match a target projection. (d) A *Variational Autoencoder* (VAE) extends the AE by introducing stochastic latent representations, enforcing structure through a KL divergence term and aligning the latent space to a target projection using either sampled or mean-based loss.
+
+[1]: images/overview.png
+[2]: images/framework.png
+
 ## Requirements
 
 * **Python** >= 3.12 ([Python 3.12.x](https://www.python.org/downloads/release/python-3120/))
@@ -42,22 +57,61 @@ pip install -r requirements-dev.txt
 ### 2. Run Experiments
 
 ```bash
-# Train models from YAML configs
+# Train models from YAML configs (defaults: ./configs, ./records, ./models, ./preprocessed)
 python3 trainer.py
+
+# Or point each I/O directory explicitly (e.g. to consume the experiment bundle)
+python3 trainer.py \
+  --config-dir experiments/table-data/models \
+  --records-dir experiments/table-data/records \
+  --models-dir experiments/table-data/models \
+  --preprocessed-dir experiments/preprocessed
 ```
 
 This will:
-- Load YAML experiment configs from the active config directory
-- Load datasets (MNIST, FashionMNIST, KMNIST, COIL-20, HAR) with precomputed 2D projections
+- Load every YAML experiment config from `--config-dir` (default `./configs/`)
+- Load datasets (MNIST, FashionMNIST, KMNIST, COIL-20, HAR) with precomputed 2D projections from `--preprocessed-dir`
 - Train autoencoder models to align latent spaces with target projections
 - Evaluate trustworthiness/continuity on the test set
-- Save model checkpoints, training logs, and metric records
+- Save model checkpoints, training logs, and metric records to `--models-dir` / `--records-dir`
+
+Already-trained configs (a matching `*.test.csv` exists) are skipped; pass `--force`
+to retrain, or `--no-render` to skip evaluation-image generation.
 
 ### 3. Generate Results Tables
 
+By default the scripts read records/configs from `./records` and `./models`:
+
 ```bash
-# Aggregate metrics and generate LaTeX tables
-python3 create_tables.py
+# Aggregate metrics and generate the main results table (terminal, or --latex)
+python3 results_table.py
+python3 results_table.py --latex
+
+# Parameter-sweep data tables
+python3 sweep_tables.py --sweep omega
+python3 sweep_tables.py --sweep alphabeta
+```
+
+#### Reproducing the paper
+
+The full experiment artifacts (configs, trained checkpoints, records, projection
+targets) live in `experiments/` — too large for the repo (gitignored). Download
+the experiment data from OSF (<https://osf.io/tb958>) and unpack it here. Then
+point the scripts at the relevant experiment directory:
+
+```bash
+# Main results table (Table 3)
+python3 results_table.py --latex \
+  --records-dir experiments/table-data/records \
+  --models-dir experiments/table-data/models
+
+# Sweep figures' data
+python3 sweep_tables.py --sweep omega \
+  --records-dir experiments/parameter-sweep/records \
+  --models-dir experiments/parameter-sweep/models
+python3 sweep_tables.py --sweep alphabeta \
+  --records-dir experiments/parameter-sweep/records \
+  --models-dir experiments/parameter-sweep/models
 ```
 
 ### 4. Lint and Format
@@ -80,16 +134,11 @@ python3 create_tables.py
 | `data_loader.py` | Dataset loading (MNIST, FashionMNIST, KMNIST, COIL-20, HAR) with paired 2D projections. |
 | `metrics.py` | Numba-optimized trustworthiness and continuity [4] computation. |
 | `projections.py` | Precomputes 2D projections (t-SNE [2], UMAP [3], PCA, MDS, Isomap, LLE) for datasets. |
-| `visual_eval.py` | Visualization: reconstruction comparisons, latent scatter plots, gradient and decision maps. |
-| `visual_eval_extra.py` | Additional visualizations: decoded grids, UMAP grid decodings, latent 2D plots. |
+| `visual_eval.py` | Visualization driver (`render_all_images`): reconstruction comparisons, latent scatter plots, decoded grids, gradient and decision maps. |
 | `gradient_map.py` | Computes and renders decoder gradient magnitude heatmaps over the latent space. |
 | `decision_map.py` | Generates classifier decision boundary maps over the latent space. |
-| `create_tables.py` | Aggregates experiment records and generates LaTeX comparison tables. |
-| `generate_main_table.py` | Collects per-config test metrics and produces summary tables. |
-| `sweep.py` | Reads sweep results and builds parameter-vs-metric tables. |
-| `sweep_aggregation.py` | Aggregates trustworthiness/continuity CSVs across sweep runs. |
-| `dist_cont_eval.py` | Analyzes test results across datasets, projections, and model types. |
-| `test_results.py` | Retrieves and summarizes test set metrics for specific configurations. |
+| `results_table.py` | Aggregates test records into the main results table (parametric/inverse projection, trustworthiness, continuity, epochs, time) as terminal or LaTeX output; also regenerates `aggregated_trust_continuity.csv`. |
+| `sweep_tables.py` | Builds the parameter-sweep data tables (ω for the AE; α/β grids for the VAE). |
 | `utils.py` | Utility functions: deterministic seeding. |
 | `dev.sh` | Shell helper for linting and formatting (Ruff, Black, isort). |
 
@@ -97,14 +146,13 @@ python3 create_tables.py
 
 | Directory | Description |
 | --- | --- |
-| `vae_mu_latent/` | YAML experiment configs for VAE sweeps. |
-| `the_big_run_yaml/` | YAML configs for large-scale experiment runs. |
-| `af_yaml/` | YAML configs for additional experiment batches. |
+| `configs/` | YAML experiment configs consumed by `trainer.py`. |
 | `models/` | Saved model checkpoints (`.pt`) and their configs (`.yaml`). |
 | `records/` | Training logs (`.train.csv`, `.val.csv`, `.test.csv`, `.truts-cont.csv`). |
 | `preprocessed/` | Precomputed 2D projection targets per dataset (t-SNE [2], UMAP [3], PCA, etc.). |
-| `datasets/` | Raw dataset files (MNIST, FashionMNIST, KMNIST, HAR). |
+| `datasets/` | Dataset files: HAR, blobs, and rings are tracked; MNIST/FashionMNIST/KMNIST/COIL-20 are downloaded on first use. |
 | `images/` | Generated visualization outputs. |
+| `experiments/` | Full experiment bundle (configs, checkpoints, records, projection targets); not in the repo — download from [OSF](https://osf.io/tb958). |
 
 ## Metrics
 
@@ -122,6 +170,10 @@ Both metrics are computed at neighborhood sizes $k = 2, 4, 8, 16, \ldots$ using 
 - **Regularization loss**: KL divergence [1] (diagonal or full covariance), differential entropy, or Jacobian Frobenius norm.
 
 ## Loading a Trained Model
+
+`load_model` reads `./models/{name}.pt` + `./models/{name}.yaml`, so the checkpoint
+must exist there first — either from your own training run or copied from the
+downloaded experiment bundle.
 
 ```python
 from models import load_model

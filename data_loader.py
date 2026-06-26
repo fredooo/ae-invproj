@@ -185,7 +185,9 @@ def create_data_loaders(
     )
 
 
-def create_loaders_for_dataset(dataset_name: str, projection: str, batch_size: int = 64):
+def create_loaders_for_dataset(
+    dataset_name: str, projection: str, batch_size: int = 64, preprocessed_dir: str = "./preprocessed"
+):
     dataset_loaders = {
         "mnist": partial(load_image_dataset, datasets.MNIST),
         "fmnist": partial(load_image_dataset, datasets.FashionMNIST),
@@ -201,7 +203,7 @@ def create_loaders_for_dataset(dataset_name: str, projection: str, batch_size: i
     else:
         vectors = torch.tensor(pd.read_csv(f"./datasets/{dataset_name}.csv").values, dtype=torch.float32)
 
-    points_2d, labels = load_csv_to_tensors(f"./preprocessed/{dataset_name}/{projection}.csv")
+    points_2d, labels = load_csv_to_tensors(f"{preprocessed_dir}/{dataset_name}/{projection}.csv")
     return create_data_loaders(vectors, points_2d, labels, batch_size)
 
 
