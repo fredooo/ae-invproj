@@ -4,8 +4,9 @@
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/)
 [![Uses: venv](https://img.shields.io/badge/Environment-venv-blue)](https://docs.python.org/3/library/venv.html)
 [![OSF Project](https://img.shields.io/badge/OSF-View%20Project-lightgrey)](https://osf.io/54byx)
+[![ScienceDirect](https://img.shields.io/badge/ScienceDirect-View-orange)](https://www.sciencedirect.com/science/article/pii/S0097849326000233)
 
-📄 **Paper:** [Paper](https://www.sciencedirect.com/science/article/pii/S0097849326000233)
+📄 **Paper:** [Link](https://frederikdennig.com/publications/Dennig2026Autoencoder)
 
 ## Key Features
 
