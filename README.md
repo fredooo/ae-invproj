@@ -182,6 +182,11 @@ from models import load_model
 model = load_model("fmnist_tsne_vae_sweep-777_0aeb65d7")
 ```
 
+## Datasets
+
+The HAR (Human Activity Recognition Using Smartphones) dataset is redistributed here under
+CC BY 4.0 from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/240/human+activity+recognition+using+smartphones) [5].
+
 ## References
 
 [1] Kingma, D. P., & Welling, M. (2014). Auto-Encoding Variational Bayes. *ICLR*.
@@ -191,6 +196,8 @@ model = load_model("fmnist_tsne_vae_sweep-777_0aeb65d7")
 [3] McInnes, L., Healy, J., & Melville, J. (2018). UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction. *arXiv:1802.03426*.
 
 [4] Venna, J., & Kaski, S. (2001). Neighborhood Preservation in Nonlinear Projection Methods: An Experimental Study. *ICANN*, 485–491.
+
+[5] Anguita, D., Ghio, A., Oneto, L., Parra, X., & Reyes-Ortiz, J. L. (2013). A Public Domain Dataset for Human Activity Recognition Using Smartphones. *ESANN 2013*, 437–442.
 
 ## License
 
